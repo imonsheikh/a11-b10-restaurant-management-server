@@ -3,7 +3,7 @@ const express = require('express')
 const cors = require('cors') 
 const jwt = require('jsonwebtoken') 
 const cookieParser = require('cookie-parser')
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const port = process.env.PORT || 9000
 const app = express() 
@@ -16,6 +16,7 @@ const corsOptions = {
 }
 app.use(cors(corsOptions))
 app.use(express.json()) //For solved req.body undefined problem 
+app.use(cookieParser()) //Parse the data of browse cookie
 
 
 //Main Server start
@@ -30,6 +31,22 @@ const client = new MongoClient(uri, {
   }
 });
 
+//JWT Verify Token(As Middleware). We Can use this into the middleware area
+const verifyToken = (req, res, next) => {
+  // console.log('Hello I am a middleware');
+const token = req.cookies?.token 
+//Only token check it is exist or not
+if(!token) return res.status(401).send({message: 'UnAuthorized Access for Token missing'}) 
+  jwt.verify(token, process.env.SECRET_KEY, (err, decoded) => {
+    //Check Error: token exist but valid or not checking
+    if(err){
+      return res.status(401).send({message: 'UnAuthorized Access for Invalid token'})
+    } 
+   req.user = decoded //Create new Property user and set the value of decoded
+  }) 
+  next()
+}
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -41,6 +58,30 @@ async function run() {
     const db = client.db('resManage-db')
     const myFoodsCollection = db.collection('my-foods')
     const myOrders = db.collection('my-orders') 
+
+    //0.Generate JWT(JSON Web token)
+    app.post('/jwt', async(req, res) => {
+      const email = req.body 
+      //Create token 
+      const token = jwt.sign(email, process.env.SECRET_KEY, {expiresIn: '365d'})//secret_key is a static key for only server but email will be dynamic 
+      // console.log(token);
+      // res.send(token) //For direct response to client 
+      res.cookie('token', token, {//For security issue pass some configuration
+         httpOnly: true,
+         secure: process.env.NODE_ENV === 'production',
+         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
+      })
+      .send({success: true})
+    })
+    // 0.1 Logout || clear cookie from browser 
+    app.get('/logout', async(req, res) => {
+      res.clearCookie('token', {
+        maxAge: 0, //As we did not transfer cookie 
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
+      })
+      .send({success: true}) 
+    })
 
     //1. Save OR ADD a food data in db
     app.post('/add-food', async(req,res) => {
@@ -57,6 +98,38 @@ async function run() {
             $options: 'i'
          }}
  
+        const result = await myFoodsCollection.find(query).toArray()
+        res.send(result)
+    }) 
+
+    //3. Get a single Food data by id from db ==>findOne() 
+    app.get('/food/:id', async(req, res) => {
+     const id = req.params.id 
+     const query = {_id: new ObjectId(id)}
+     const result = await myFoodsCollection.findOne(query) 
+     res.send(result)
+    }) 
+    // 4. Add food purchase 
+    app.post('/add-food-purchase', async(req, res) => {
+      const purchaseData = req.body 
+      // console.log(purchaseData); 
+
+      const result = await myOrders.insertOne(purchaseData) 
+      res.send(result)
+    })
+    //5. GET all foods posted by specific user ==> query + email + find().toArray()
+    app.get('/foods/:email', verifyToken, async(req, res) => {
+       const email = req.params.email
+       const decodedEmail = req.user?.email
+
+       // console.log('Email from Token-->', decodedEmail);
+       // console.log('Email from params-->', email);
+       //Check email and decodededEmail 
+       if(decodedEmail !== email) return res.status(401).send({message: 'UnAuthorized Access Email did not matched'}) 
+
+        const query = {
+          'buyer.email': email
+        } 
         const result = await myFoodsCollection.find(query).toArray()
         res.send(result)
     })
