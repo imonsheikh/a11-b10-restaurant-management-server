@@ -113,8 +113,16 @@ async function run() {
     app.post('/add-food-purchase', async(req, res) => {
       const purchaseData = req.body 
       // console.log(purchaseData); 
-
-      const result = await myOrdersCollection.insertOne(purchaseData) 
+       //a Save Or create myOrdersCollection
+      const result = await myOrdersCollection.insertOne(purchaseData)
+        //b. Increase purchaseCount 
+        const filter = {_id: new ObjectId(purchaseData.purchaseId)}
+        const updated = {
+          $inc: {
+            purchaseCount: 1
+          }
+        } 
+        const updatePurchaseCount = await myFoodsCollection.updateOne(filter, updated)
       res.send(result)
     })
     //5. GET all foods posted by specific user ==> query + email + find().toArray()
