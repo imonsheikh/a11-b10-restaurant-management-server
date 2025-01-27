@@ -116,6 +116,7 @@ async function run() {
     app.post('/add-food-purchase', async(req, res) => {
       const purchaseData = req.body 
       // console.log(purchaseData); 
+       
        //a Save Or create myOrdersCollection
       const result = await myOrdersCollection.insertOne(purchaseData)
         //b. Increase purchaseCount 
