@@ -57,7 +57,7 @@ async function run() {
 
     const db = client.db('resManage-db')
     const myFoodsCollection = db.collection('my-foods')
-    const myOrders = db.collection('my-orders') 
+    const myOrdersCollection = db.collection('my-orders') 
 
     //0.Generate JWT(JSON Web token)
     app.post('/jwt', async(req, res) => {
@@ -114,7 +114,7 @@ async function run() {
       const purchaseData = req.body 
       // console.log(purchaseData); 
 
-      const result = await myOrders.insertOne(purchaseData) 
+      const result = await myOrdersCollection.insertOne(purchaseData) 
       res.send(result)
     })
     //5. GET all foods posted by specific user ==> query + email + find().toArray()
@@ -132,6 +132,43 @@ async function run() {
         } 
         const result = await myFoodsCollection.find(query).toArray()
         res.send(result)
+    }) 
+    //6.Update a FoodData in DB ==> updateOne()
+    app.put('/update-food/:id', async(req, res) => {
+      const id = req.params.id 
+      const foodData = req.body 
+
+      const filter = {_id: new ObjectId(id)} //OR
+      // const query = {_id: new ObjectId(id)}
+      const updated = {
+        $set: foodData
+      }
+      const options = {upsert: true} 
+      
+      const result = await myFoodsCollection.updateOne(filter, updated, options)
+      res.send(result) 
+    })
+
+    //7.Get All Order data 
+    app.get('/orders/:email',verifyToken, async(req,res) => {
+      const email = req.params.email
+      const decodedEmail = req.user?.email 
+
+      //Validate email 
+      if(decodedEmail !== email) return res.status(401).send({message: 'UnAuthorized Access for email'}) 
+      
+      const query = {email: email}
+      const result = await myOrdersCollection.find(query).toArray()
+      res.send(result)
+    })
+
+    //Order delete 
+    app.delete('/order/:id', verifyToken, async(req, res) => {
+      const id = req.params.id 
+      const query = {_id: new ObjectId(id)} 
+
+      const result = await myOrdersCollection.deleteOne(query)
+      res.send(result)
     })
 
   } finally {
