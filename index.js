@@ -10,7 +10,11 @@ const app = express()
 
 //Middleware 
 const corsOptions = {
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: [
+      'http://localhost:5173',
+       'http://localhost:5174',
+      'https://restaurant-management-399f0.web.app'
+    ],
     credentials: true, 
     optionalSuccessStatus: 200
 }
@@ -52,9 +56,8 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     const db = client.db('resManage-db')
     const myFoodsCollection = db.collection('my-foods')
     const myOrdersCollection = db.collection('my-orders') 
@@ -170,12 +173,17 @@ async function run() {
       res.send(result)
     })
 
-    //Order delete 
+    //8. Order delete 
     app.delete('/order/:id', verifyToken, async(req, res) => {
       const id = req.params.id 
       const query = {_id: new ObjectId(id)} 
 
       const result = await myOrdersCollection.deleteOne(query)
+      res.send(result)
+    })
+    // 9.foods
+    app.get('/foods', async (req, res) => {
+      const result = await myFoodsCollection.find().sort({purchaseCount: - 1}).limit(6).toArray()
       res.send(result)
     })
 
